@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="FlowPass — skip the stadium crowd. Arrive on time, leave on time.">
+    <title>{{ app_name }}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:text-black focus:px-3 focus:py-2 focus:rounded">Skip to main content</a>
+
+    <main id="main-content" class="max-w-md mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">{{ app_name }}</h1>
+            <p class="text-slate-400 text-sm mt-1">Skip the crowd. Arrive on time, leave on time.</p>
+        </header>
+
+        <section aria-labelledby="status-heading" class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+            <h2 id="status-heading" class="text-xs uppercase tracking-wider text-slate-500 mb-2">Status</h2>
+            <p class="text-2xl font-semibold">Slice 1 running</p>
+            <p class="text-slate-400 text-sm mt-2">Foundation is live. Engine, routes, and data ship in later slices.</p>
+        </section>
+    </main>
+</body>
+</html>
