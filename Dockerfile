@@ -4,7 +4,7 @@
 FROM python:3.11-slim AS builder
 
 # uv is the fastest way to install Python deps; copy the static binary in.
-COPY --from=ghcr.io/astral-sh/uv:0.5.0 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.5.29 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
@@ -21,14 +21,17 @@ RUN uv sync --frozen --no-dev
 
 FROM python:3.11-slim AS runtime
 
-# Create a non-root user for the app. Running as root inside containers is a
-# common finding in security scans; this avoids it.
-RUN groupadd --system app && useradd --system --gid app --home-dir /app appuser
+# Create a non-root user with a known numeric UID so that COPY --chown
+# in the next step can resolve it without depending on the name being
+# visible to the cross-stage chown resolver.
+RUN groupadd --system --gid 1001 app \
+    && useradd --system --uid 1001 --gid 1001 --home-dir /app appuser
 
 WORKDIR /app
 
-# Copy the built virtualenv and the application code.
-COPY --from=builder --chown=app:app /app /app
+# Copy the built virtualenv and application code using numeric uid:gid,
+# which is the portable way to chown when the source stage lacks the user.
+COPY --from=builder --chown=1001:1001 /app /app
 
 # PATH ensures the .venv python is found first.
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -36,7 +39,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080
 
-USER appuser
+USER 1001
 
 EXPOSE 8080
 
