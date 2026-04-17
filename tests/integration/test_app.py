@@ -9,10 +9,10 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-def test_healthz_returns_ok() -> None:
+def test_health_returns_ok() -> None:
     """The liveness probe must return 200 with status ok."""
     with TestClient(app) as client:
-        response = client.get("/healthz")
+        response = client.get("/health")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
@@ -30,7 +30,7 @@ def test_index_renders() -> None:
 def test_security_headers_present() -> None:
     """Every response must include the standard security headers."""
     with TestClient(app) as client:
-        response = client.get("/healthz")
+        response = client.get("/health")
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert "Content-Security-Policy" in response.headers

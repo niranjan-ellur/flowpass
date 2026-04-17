@@ -79,9 +79,13 @@ def create_app() -> FastAPI:
 
     templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-    @app.get("/healthz")
-    async def healthz() -> dict[str, str]:
-        """Liveness probe used by Cloud Run and CI."""
+    @app.get("/health")
+    async def health() -> dict[str, str]:
+        """Liveness probe used by Cloud Run and CI.
+
+        Note: /healthz is reserved by Google's Cloud Run frontend, so we
+        use /health here to ensure the route reaches our container.
+        """
         return {"status": "ok", "version": settings.app_version}
 
     @app.get("/", response_class=HTMLResponse)
