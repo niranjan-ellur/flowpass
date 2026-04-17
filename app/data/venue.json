@@ -1,0 +1,206 @@
+{
+  "id": "chinnaraya",
+  "name": "Chinnaraya Stadium",
+  "city": "Bengaluru",
+  "capacity": 60000,
+  "latitude": 12.9788,
+  "longitude": 77.5996,
+  "generated_at": null,
+  "source_prompt_hash": null,
+  "sections": [
+    {
+      "id": "P1",
+      "name": "Pavilion North",
+      "tier": 1,
+      "preferred_gate_ids": ["G1", "G2"],
+      "step_free_gate_ids": ["G1"]
+    },
+    {
+      "id": "P2",
+      "name": "Pavilion East",
+      "tier": 1,
+      "preferred_gate_ids": ["G3", "G4"],
+      "step_free_gate_ids": ["G3"]
+    },
+    {
+      "id": "P3",
+      "name": "Pavilion South",
+      "tier": 1,
+      "preferred_gate_ids": ["G5", "G6"],
+      "step_free_gate_ids": ["G5"]
+    },
+    {
+      "id": "P4",
+      "name": "Pavilion West",
+      "tier": 1,
+      "preferred_gate_ids": ["G7", "G8"],
+      "step_free_gate_ids": ["G7"]
+    },
+    {
+      "id": "G7",
+      "name": "General North Upper",
+      "tier": 3,
+      "preferred_gate_ids": ["G1", "G2"],
+      "step_free_gate_ids": []
+    },
+    {
+      "id": "G8",
+      "name": "General East Upper",
+      "tier": 3,
+      "preferred_gate_ids": ["G3", "G4"],
+      "step_free_gate_ids": []
+    },
+    {
+      "id": "G9",
+      "name": "General South Upper",
+      "tier": 3,
+      "preferred_gate_ids": ["G5", "G6"],
+      "step_free_gate_ids": []
+    },
+    {
+      "id": "C1",
+      "name": "Corporate Box A",
+      "tier": 2,
+      "preferred_gate_ids": ["G2"],
+      "step_free_gate_ids": ["G2"]
+    }
+  ],
+  "gates": [
+    {
+      "id": "G1",
+      "name": "Gate 1 - North Main",
+      "bearing_deg": 0,
+      "is_wheelchair_accessible": true,
+      "is_covered_entry": true,
+      "nearest_transit_id": "metro_cubbon",
+      "capacity_per_minute": 120
+    },
+    {
+      "id": "G2",
+      "name": "Gate 2 - North East",
+      "bearing_deg": 45,
+      "is_wheelchair_accessible": true,
+      "is_covered_entry": false,
+      "nearest_transit_id": "metro_cubbon",
+      "capacity_per_minute": 90
+    },
+    {
+      "id": "G3",
+      "name": "Gate 3 - East Main",
+      "bearing_deg": 90,
+      "is_wheelchair_accessible": true,
+      "is_covered_entry": true,
+      "nearest_transit_id": "metro_mg_road",
+      "capacity_per_minute": 140
+    },
+    {
+      "id": "G4",
+      "name": "Gate 4 - South East",
+      "bearing_deg": 135,
+      "is_wheelchair_accessible": false,
+      "is_covered_entry": false,
+      "nearest_transit_id": "metro_mg_road",
+      "capacity_per_minute": 80
+    },
+    {
+      "id": "G5",
+      "name": "Gate 5 - South Main",
+      "bearing_deg": 180,
+      "is_wheelchair_accessible": true,
+      "is_covered_entry": true,
+      "nearest_transit_id": "bus_richmond",
+      "capacity_per_minute": 110
+    },
+    {
+      "id": "G6",
+      "name": "Gate 6 - South West",
+      "bearing_deg": 225,
+      "is_wheelchair_accessible": false,
+      "is_covered_entry": false,
+      "nearest_transit_id": "parking_south",
+      "capacity_per_minute": 75
+    },
+    {
+      "id": "G7",
+      "name": "Gate 7 - West Main",
+      "bearing_deg": 270,
+      "is_wheelchair_accessible": true,
+      "is_covered_entry": true,
+      "nearest_transit_id": "parking_west",
+      "capacity_per_minute": 100
+    },
+    {
+      "id": "G8",
+      "name": "Gate 8 - North West",
+      "bearing_deg": 315,
+      "is_wheelchair_accessible": false,
+      "is_covered_entry": false,
+      "nearest_transit_id": "metro_cubbon",
+      "capacity_per_minute": 70
+    }
+  ],
+  "transit_stops": [
+    {
+      "id": "metro_cubbon",
+      "name": "Cubbon Park Metro",
+      "mode": "metro",
+      "walk_seconds_to_gate": {"G1": 420, "G2": 480, "G8": 540}
+    },
+    {
+      "id": "metro_mg_road",
+      "name": "MG Road Metro",
+      "mode": "metro",
+      "walk_seconds_to_gate": {"G3": 360, "G4": 420}
+    },
+    {
+      "id": "bus_richmond",
+      "name": "Richmond Road Bus Stop",
+      "mode": "bus",
+      "walk_seconds_to_gate": {"G5": 240, "G6": 300}
+    },
+    {
+      "id": "parking_south",
+      "name": "South Parking",
+      "mode": "parking",
+      "walk_seconds_to_gate": {"G5": 180, "G6": 120}
+    },
+    {
+      "id": "parking_west",
+      "name": "West Parking",
+      "mode": "parking",
+      "walk_seconds_to_gate": {"G7": 150, "G8": 210}
+    }
+  ],
+  "route_segments": [
+    {
+      "from_id": "metro_cubbon",
+      "to_id": "G1",
+      "instruction": "Exit metro, walk north along Cubbon Road, covered footpath the whole way",
+      "distance_m": 420,
+      "has_stairs": false,
+      "is_covered": true,
+      "wheelchair_accessible": true,
+      "base_walk_seconds": 420
+    },
+    {
+      "from_id": "G1",
+      "to_id": "P1",
+      "instruction": "Enter Gate 1, take ramp to Pavilion North concourse",
+      "distance_m": 80,
+      "has_stairs": false,
+      "is_covered": true,
+      "wheelchair_accessible": true,
+      "base_walk_seconds": 120
+    },
+    {
+      "from_id": "metro_mg_road",
+      "to_id": "G3",
+      "instruction": "Exit metro platform, follow signs for stadium east entry",
+      "distance_m": 380,
+      "has_stairs": false,
+      "is_covered": true,
+      "wheelchair_accessible": true,
+      "base_walk_seconds": 360
+    }
+  ]
+}
