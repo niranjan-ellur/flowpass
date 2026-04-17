@@ -4,24 +4,104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="FlowPass — skip the stadium crowd. Arrive on time, leave on time.">
-    <title>{{ app_name }}</title>
+    <title>{{ app_name }} · {{ venue.name }}</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/static/app.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-white focus:text-black focus:px-3 focus:py-2 focus:rounded">Skip to main content</a>
+    <a href="#recommendation" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:bg-sky-400 focus:text-black focus:px-3 focus:py-2 focus:rounded focus:font-semibold">Skip to recommendation</a>
 
-    <main id="main-content" class="max-w-md mx-auto px-4 py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold tracking-tight">{{ app_name }}</h1>
+    <main class="max-w-md mx-auto px-4 py-6 space-y-6">
+        <header>
+            <div class="flex items-baseline justify-between">
+                <h1 class="text-3xl font-bold tracking-tight">{{ app_name }}</h1>
+                <span class="text-xs uppercase tracking-wider text-slate-500" aria-label="Venue">{{ venue.name }}</span>
+            </div>
             <p class="text-slate-400 text-sm mt-1">Skip the crowd. Arrive on time, leave on time.</p>
         </header>
 
-        <section aria-labelledby="status-heading" class="bg-slate-900 rounded-xl p-6 border border-slate-800">
-            <h2 id="status-heading" class="text-xs uppercase tracking-wider text-slate-500 mb-2">Status</h2>
-            <p class="text-2xl font-semibold">Slice 1 running</p>
-            <p class="text-slate-400 text-sm mt-2">Foundation is live. Engine, routes, and data ship in later slices.</p>
+        <section id="recommendation"
+                 aria-labelledby="rec-heading"
+                 aria-live="polite"
+                 aria-atomic="true"
+                 class="min-h-[340px]">
+            <h2 id="rec-heading" class="sr-only">Your recommendation</h2>
+            <div class="bg-slate-900 rounded-xl p-6 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">Waiting for your picks</p>
+                <p class="text-2xl font-semibold leading-tight">Choose your seat and transit below.</p>
+                <p class="text-slate-400 text-sm mt-2">FlowPass stays quiet until the match needs your attention.</p>
+            </div>
         </section>
+
+        <form id="picker"
+              hx-post="/api/recommendation"
+              hx-target="#recommendation"
+              hx-swap="innerHTML"
+              hx-trigger="change, submit, change from:input[name='phase']"
+              class="bg-slate-900 rounded-xl p-5 border border-slate-800 space-y-4"
+              aria-labelledby="picker-heading">
+            <h2 id="picker-heading" class="text-sm font-semibold text-slate-300">Your details</h2>
+
+            <div>
+                <label for="section_id" class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Section</label>
+                <select id="section_id" name="section_id" required
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                    {% for section in venue.sections %}
+                    <option value="{{ section.id }}">{{ section.id }} — {{ section.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="transit_mode" class="block text-xs uppercase tracking-wider text-slate-400 mb-1">Arriving by</label>
+                <select id="transit_mode" name="transit_mode" required
+                        class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                    {% for value, label in transit_modes %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <input id="step_free" name="step_free" type="checkbox" value="1"
+                       class="w-5 h-5 rounded border-slate-600 bg-slate-800 text-sky-400 focus-visible:ring-2 focus-visible:ring-sky-400">
+                <label for="step_free" class="text-sm text-slate-200">Step-free route (wheelchair, stroller, injury)</label>
+            </div>
+        </form>
+
+        <section aria-labelledby="scrubber-heading"
+                 class="bg-slate-900 rounded-xl p-5 border border-slate-800">
+            <div class="flex items-center justify-between mb-3">
+                <h2 id="scrubber-heading" class="text-sm font-semibold text-slate-300">Match clock (demo)</h2>
+                <span class="text-xs text-slate-500">Scrub to preview</span>
+            </div>
+            <fieldset class="grid grid-cols-2 gap-2">
+                <legend class="sr-only">Select match phase</legend>
+                {% for value, label in phases %}
+                <label class="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer hover:border-sky-500 focus-within:ring-2 focus-within:ring-sky-400 transition-colors">
+                    <input type="radio" name="phase" value="{{ value }}"
+                           {% if loop.first %}checked{% endif %}
+                           form="picker"
+                           class="accent-sky-400">
+                    <span class="text-sm">{{ label }}</span>
+                </label>
+                {% endfor %}
+            </fieldset>
+        </section>
+
+        <footer class="text-center text-xs text-slate-600 pt-4 pb-8">
+            <p>{{ venue.name }} · {{ venue.city }} · {{ '{:,}'.format(venue.capacity) }} capacity</p>
+            <p class="mt-1">Build-time AI · runtime rules · zero LLM calls on recommendation path</p>
+        </footer>
     </main>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("picker");
+            if (form) htmx.trigger(form, "submit");
+        });
+    </script>
 </body>
 </html>
