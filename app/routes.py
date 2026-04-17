@@ -1,6 +1,6 @@
 """HTTP routes for FlowPass.
 
-Kept thin. Each handler parses input (Pydantic does the work), calls the
+Kept thin. Each handler parses input (Pydantic validates), calls the
 engine (pure), and returns HTML (Jinja). Anything more complex belongs
 in the engine or a service.
 """
@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 
+from app.config import get_settings
 from app.engine import recommend
 from app.models import (
     MatchPhase,
@@ -22,6 +23,7 @@ from app.models import (
     UserPreferences,
     Venue,
 )
+from app.services.weather import fetch_current_conditions
 
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -61,10 +63,13 @@ async def get_recommendation(
 ) -> HTMLResponse:
     """Return an HTML fragment with the current recommendation.
 
-    Called via HTMX from the main page. Returning HTML directly keeps the
-    client simple: no JSON parsing, no render logic on the client side.
+    Called via HTMX from the main page. Returns HTML directly so the
+    client stays simple: no JSON parsing, no render logic on the client.
+    Weather is fetched best-effort; failures degrade gracefully.
     """
     venue: Venue = request.app.state.venue
+    reason_templates = request.app.state.reason_templates
+    settings = get_settings()
 
     try:
         prefs = UserPreferences(
@@ -78,13 +83,41 @@ async def get_recommendation(
 
     match_state = _match_state_from_phase(match_phase)
 
+    weather = None
+    if settings.maps_api_key:
+        weather = await fetch_current_conditions(
+            latitude=venue.latitude,
+            longitude=venue.longitude,
+            api_key=settings.maps_api_key,
+        )
+
     try:
-        rec = recommend(venue, prefs, match_state)
+        rec = recommend(
+            venue,
+            prefs,
+            match_state,
+            weather=weather,
+            reason_templates=reason_templates,
+        )
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    gate = venue.gate_by_id(rec.gate_id)
+    transit_stop = None
+    if gate.nearest_transit_id:
+        transit_stop = next(
+            (t for t in venue.transit_stops if t.id == gate.nearest_transit_id), None
+        )
 
     return templates.TemplateResponse(
         request=request,
         name="partials/recommendation.html",
-        context={"rec": rec, "phase": match_phase.value},
+        context={
+            "rec": rec,
+            "phase": match_phase.value,
+            "weather": weather,
+            "gate": gate,
+            "transit_stop": transit_stop,
+            "venue": venue,
+        },
     )

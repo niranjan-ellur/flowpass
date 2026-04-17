@@ -2,7 +2,8 @@
 
 Kept deliberately thin: route handlers live in app.routes, the engine is
 pure, services live at the edge. Middleware handles cross-cutting
-concerns; lifespan loads the venue graph once at startup.
+concerns; lifespan loads the venue graph and reason templates once at
+startup so every request reads from in-memory objects.
 """
 
 from collections.abc import AsyncIterator
@@ -18,6 +19,7 @@ from starlette.responses import Response
 
 from app.config import get_settings
 from app.routes import router as api_router
+from app.services.reason_templates_loader import load_reason_templates
 from app.services.venue_loader import load_venue
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -29,8 +31,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Attach standard security headers to every response.
 
     Defends against MIME sniffing, clickjacking, referrer leaks, and
-    unsanctioned browser features. CSP is intentionally strict; when
-    Maps arrives in slice 4 we'll extend it deliberately.
+    unsanctioned browser features. CSP allows Maps JS and gstatic so
+    the Google Maps script can load.
     """
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -42,10 +44,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com "
-            "https://unpkg.com https://maps.googleapis.com; "
-            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "
+            "https://unpkg.com https://maps.googleapis.com https://maps.gstatic.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com "
+            "https://fonts.googleapis.com; "
             "img-src 'self' data: https:; "
-            "connect-src 'self' https://maps.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com data:; "
+            "connect-src 'self' https://maps.googleapis.com "
+            "https://weather.googleapis.com; "
             "frame-ancestors 'none';"
         )
         return response
@@ -53,13 +58,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Load the venue graph once at startup, stash it on app.state.
+    """Load the venue graph and reason templates once at startup.
 
-    Every request reads from the in-memory object — zero disk I/O on the
+    Every request reads from in-memory objects — zero disk I/O on the
     hot path.
     """
     settings = get_settings()
     app.state.venue = load_venue(settings.venue_data_path)
+    app.state.reason_templates = load_reason_templates(settings.reason_templates_path)
     yield
 
 
@@ -98,6 +104,7 @@ def create_app() -> FastAPI:
             context={
                 "app_name": settings.app_name,
                 "venue": venue,
+                "maps_api_key": settings.maps_api_key,
                 "phases": [
                     ("pre_match", "Pre-match"),
                     ("in_play", "In play"),

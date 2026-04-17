@@ -103,5 +103,89 @@
             if (form) htmx.trigger(form, "submit");
         });
     </script>
+
+    {% if maps_api_key %}
+    <script>
+        // FlowPassMap: idempotently renders the map into the current partial.
+        // Each HTMX swap replaces the #flowpass-map element, so we always
+        // re-initialize against the fresh div. AdvancedMarkerElement is the
+        // modern API (google.maps.Marker was deprecated Feb 2024).
+        window.FlowPassMap = (function () {
+            async function render() {
+                const container = document.querySelector("[data-flowpass-map]");
+                const mapDiv = document.getElementById("flowpass-map");
+                if (!container || !mapDiv) return;
+                if (!window.google || !window.google.maps) return;
+
+                const lat = parseFloat(container.dataset.venueLat);
+                const lng = parseFloat(container.dataset.venueLng);
+                const gateName = container.dataset.gateName || "Gate";
+                const transitName = container.dataset.transitName || "Transit";
+
+                const { Map } = await google.maps.importLibrary("maps");
+                const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+
+                const map = new Map(mapDiv, {
+                    center: { lat, lng },
+                    zoom: 16,
+                    mapId: "DEMO_MAP_ID",
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                    gestureHandling: "cooperative"
+                });
+
+                const transitLat = lat - 0.0025;
+                const transitLng = lng - 0.0025;
+
+                const gatePin = new PinElement({
+                    background: "#38bdf8",
+                    borderColor: "#0369a1",
+                    glyphColor: "white",
+                    glyph: "G"
+                });
+                new AdvancedMarkerElement({
+                    map,
+                    position: { lat, lng },
+                    title: gateName,
+                    content: gatePin.element
+                });
+
+                const transitPin = new PinElement({
+                    background: "#a855f7",
+                    borderColor: "#6b21a8",
+                    glyphColor: "white",
+                    glyph: "T"
+                });
+                new AdvancedMarkerElement({
+                    map,
+                    position: { lat: transitLat, lng: transitLng },
+                    title: transitName,
+                    content: transitPin.element
+                });
+
+                new google.maps.Polyline({
+                    path: [
+                        { lat: transitLat, lng: transitLng },
+                        { lat, lng }
+                    ],
+                    geodesic: true,
+                    strokeColor: "#38bdf8",
+                    strokeOpacity: 0.9,
+                    strokeWeight: 4,
+                    map
+                });
+            }
+
+            return { render };
+        }());
+
+        function flowPassMapsReady() {
+            window.FlowPassMap.render();
+        }
+    </script>
+    <script
+            src="https://maps.googleapis.com/maps/api/js?key={{ maps_api_key }}&callback=flowPassMapsReady&v=weekly&loading=async">
+    </script>
+    {% endif %}
 </body>
 </html>

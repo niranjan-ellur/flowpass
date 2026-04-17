@@ -24,7 +24,7 @@
     }
 }
 
-/* A soft fade-in for freshly swapped HTMX fragments. Only runs once. */
+/* A soft fade-in for freshly swapped HTMX fragments. */
 @keyframes flowpass-fade-in {
     from { opacity: 0; transform: translateY(4px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -38,4 +38,14 @@
 :focus-visible {
     outline: 2px solid rgb(56 189 248);
     outline-offset: 2px;
+}
+
+/* Pin the map container to a fixed height so Google Maps can't
+   expand past its parent during HTMX swaps. */
+#flowpass-map {
+    height: 14rem;
+    min-height: 14rem;
+    max-height: 14rem;
+    width: 100%;
+    position: relative;
 }

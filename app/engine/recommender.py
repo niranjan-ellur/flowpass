@@ -1,12 +1,12 @@
 """Recommendation engine.
 
-Pure functions that take the domain state and user preferences and return
-a single Recommendation. No I/O, no framework, no global state. This is
-the module that must stay fast, predictable, and heavily tested.
+Pure functions that take the domain state, user preferences, optional
+weather, and reason templates, and return a single Recommendation.
+No I/O, no framework, no global state.
 
-The design principle: every branch that changes the output has a unique
-reason_code. This makes recommendations greppable in logs and testable by
-asserting on reason_code rather than prose.
+Design principle: every branch that changes the output has a unique
+reason_code. That makes recommendations greppable in logs and testable
+by asserting on reason_code rather than prose.
 """
 
 from __future__ import annotations
@@ -23,24 +23,92 @@ from app.models.recommendation import (
     UserPreferences,
 )
 from app.models.venue import Gate, Section, Venue
+from app.services.weather import WeatherSnapshot
+
+ReasonTemplates = dict[str, dict[str, str]]
 
 
-def _pick_gate(venue: Venue, section: Section, prefer_step_free: bool) -> Gate:
-    """Pick the best gate for this section given accessibility needs.
+# Fallback strings used when the Gemini-generated templates are unavailable.
+_FALLBACK_REASONS: ReasonTemplates = {
+    "entry_standard": {
+        "headline": "Arrive via {gate_name}",
+        "subtext": "Clear path right now. No crowd yet.",
+    },
+    "entry_beat_crush": {
+        "headline": "Arrive via {gate_name} — ingress crush building",
+        "subtext": "Go now. Queues at this gate are shortest on this approach.",
+    },
+    "entry_step_free": {
+        "headline": "Arrive via {gate_name}",
+        "subtext": "Step-free route. Covered where possible.",
+    },
+    "entry_weather_covered": {
+        "headline": "Rain ahead — arrive via {gate_name}",
+        "subtext": "Covered entry. Stay dry on your way in.",
+    },
+    "exit_standard": {
+        "headline": "Leave in 15 min via {gate_name}",
+        "subtext": "Plan your path. You have time.",
+    },
+    "exit_pre_peak": {
+        "headline": "Leave now via {gate_name}",
+        "subtext": "Exit flood imminent. This gate clears first.",
+    },
+    "exit_after_ceremony": {
+        "headline": "Leave in 8 min via {gate_name}",
+        "subtext": "Ceremony wrapping. Metro peak hits right after.",
+    },
+    "exit_weather_urgent": {
+        "headline": "Rain starting — leave now via {gate_name}",
+        "subtext": "Covered route. Beat the downpour to the metro.",
+    },
+}
 
-    Step-free users get a step-free gate if one is listed; otherwise we
-    fall back to the first preferred gate that is wheelchair-accessible.
-    Regular users get the section's first preferred gate.
+
+def _render_reason(
+    templates: ReasonTemplates,
+    reason_code: str,
+    gate_name: str,
+) -> tuple[str, str]:
+    """Return (headline, subtext) for a reason code, substituting {gate_name}.
+
+    Uses Gemini-generated templates when present, falls back to hardcoded
+    strings when not. Either way, the user always gets a valid message.
+    """
+    template = templates.get(reason_code) or _FALLBACK_REASONS.get(reason_code)
+    if template is None:
+        return (f"Arrive via {gate_name}", "Clear path.")
+    headline = template["headline"].replace("{gate_name}", gate_name)
+    subtext = template["subtext"].replace("{gate_name}", gate_name)
+    return headline, subtext
+
+
+def _pick_gate(
+    venue: Venue,
+    section: Section,
+    prefer_step_free: bool,
+    prefer_covered: bool,
+) -> Gate:
+    """Pick the best gate given accessibility and weather needs.
+
+    Priority order:
+    1. Step-free if requested (accessibility overrides weather)
+    2. Covered gate among preferred if rain is expected
+    3. First preferred gate
     """
     if prefer_step_free and section.step_free_gate_ids:
         return venue.gate_by_id(section.step_free_gate_ids[0])
 
     if prefer_step_free:
-        # Section has no declared step-free gates; fall back to any
-        # preferred gate marked wheelchair-accessible at the gate level.
         for gate_id in section.preferred_gate_ids:
             gate = venue.gate_by_id(gate_id)
             if gate.is_wheelchair_accessible:
+                return gate
+
+    if prefer_covered:
+        for gate_id in section.preferred_gate_ids:
+            gate = venue.gate_by_id(gate_id)
+            if gate.is_covered_entry:
                 return gate
 
     return venue.gate_by_id(section.preferred_gate_ids[0])
@@ -99,34 +167,57 @@ def _exit_steps(gate: Gate, section: Section, prefs: UserPreferences) -> list[Ro
     ]
 
 
-def recommend_entry(
-    venue: Venue, prefs: UserPreferences, match_state: MatchState
-) -> Recommendation:
-    """Produce the Entry-mode recommendation.
+def _choose_entry_reason(
+    prefs: UserPreferences,
+    weather: WeatherSnapshot | None,
+    congestion_value: str,
+) -> str:
+    """Pick the reason code for an entry recommendation."""
+    if prefs.step_free:
+        return "entry_step_free"
+    if weather is not None and weather.rain_expected_within_hour:
+        return "entry_weather_covered"
+    if congestion_value in {"high", "severe"}:
+        return "entry_beat_crush"
+    return "entry_standard"
 
-    Called before and during early match phases. Focus: get the user
-    through security and into their seat without missing the first ball.
-    """
+
+def _choose_exit_reason(
+    phase: MatchPhase,
+    weather: WeatherSnapshot | None,
+    congestion_value: str,
+) -> str:
+    """Pick the reason code for an exit recommendation."""
+    if weather is not None and weather.is_raining:
+        return "exit_weather_urgent"
+    if phase == MatchPhase.TROPHY_CEREMONY:
+        return "exit_after_ceremony"
+    if congestion_value == "severe":
+        return "exit_pre_peak"
+    return "exit_standard"
+
+
+def recommend_entry(
+    venue: Venue,
+    prefs: UserPreferences,
+    match_state: MatchState,
+    *,
+    weather: WeatherSnapshot | None = None,
+    reason_templates: ReasonTemplates | None = None,
+) -> Recommendation:
+    """Produce the Entry-mode recommendation."""
     section = venue.section_by_id(prefs.section_id)
-    gate = _pick_gate(venue, section, prefer_step_free=prefs.step_free)
+    prefer_covered = weather is not None and weather.rain_expected_within_hour
+    gate = _pick_gate(
+        venue, section, prefer_step_free=prefs.step_free, prefer_covered=prefer_covered
+    )
     congestion = expected_gate_congestion(
         match_state.phase,
         match_state.minutes_into_match,
         match_state.minutes_until_end_estimate,
     )
-
-    if prefs.step_free:
-        reason_code = "entry_step_free"
-        headline = f"Arrive via {gate.name}"
-        subtext = "Step-free route. Covered where possible."
-    elif congestion.value in {"high", "severe"}:
-        reason_code = "entry_beat_crush"
-        headline = f"Arrive via {gate.name} — ingress crush building"
-        subtext = "Go now. Queues at this gate are shortest on this approach."
-    else:
-        reason_code = "entry_standard"
-        headline = f"Arrive via {gate.name}"
-        subtext = "Clear path right now. No crowd yet."
+    reason_code = _choose_entry_reason(prefs, weather, congestion.value)
+    headline, subtext = _render_reason(reason_templates or {}, reason_code, gate.name)
 
     return Recommendation(
         mode=AppMode.ENTRY,
@@ -141,32 +232,27 @@ def recommend_entry(
     )
 
 
-def recommend_exit(venue: Venue, prefs: UserPreferences, match_state: MatchState) -> Recommendation:
-    """Produce the Exit-mode recommendation.
-
-    Called in the final phases. Focus: leave at the right moment so the
-    user misses the transit platform peak without missing the trophy.
-    """
+def recommend_exit(
+    venue: Venue,
+    prefs: UserPreferences,
+    match_state: MatchState,
+    *,
+    weather: WeatherSnapshot | None = None,
+    reason_templates: ReasonTemplates | None = None,
+) -> Recommendation:
+    """Produce the Exit-mode recommendation."""
     section = venue.section_by_id(prefs.section_id)
-    gate = _pick_gate(venue, section, prefer_step_free=prefs.step_free)
+    prefer_covered = weather is not None and weather.is_raining
+    gate = _pick_gate(
+        venue, section, prefer_step_free=prefs.step_free, prefer_covered=prefer_covered
+    )
     congestion = expected_gate_congestion(
         match_state.phase,
         match_state.minutes_into_match,
         match_state.minutes_until_end_estimate,
     )
-
-    if match_state.phase == MatchPhase.TROPHY_CEREMONY:
-        reason_code = "exit_after_ceremony"
-        headline = f"Leave in 8 min via {gate.name}"
-        subtext = "Ceremony wrapping. Metro peak hits right after."
-    elif congestion.value == "severe":
-        reason_code = "exit_pre_peak"
-        headline = f"Leave now via {gate.name}"
-        subtext = "Exit flood imminent. This gate clears first."
-    else:
-        reason_code = "exit_standard"
-        headline = f"Leave in 15 min via {gate.name}"
-        subtext = "Plan your path. You have time."
+    reason_code = _choose_exit_reason(match_state.phase, weather, congestion.value)
+    headline, subtext = _render_reason(reason_templates or {}, reason_code, gate.name)
 
     return Recommendation(
         mode=AppMode.EXIT,
@@ -181,12 +267,23 @@ def recommend_exit(venue: Venue, prefs: UserPreferences, match_state: MatchState
     )
 
 
-def recommend(venue: Venue, prefs: UserPreferences, match_state: MatchState) -> Recommendation:
+def recommend(
+    venue: Venue,
+    prefs: UserPreferences,
+    match_state: MatchState,
+    *,
+    weather: WeatherSnapshot | None = None,
+    reason_templates: ReasonTemplates | None = None,
+) -> Recommendation:
     """Route to entry or exit recommender based on match phase.
 
-    This is the single public entry point for the engine. Callers don't
-    need to know about AppMode; the engine decides.
+    Single public entry point for the engine. Callers do not need to
+    know about AppMode; the engine decides.
     """
     if should_activate_exit_mode(match_state.phase, match_state.minutes_until_end_estimate):
-        return recommend_exit(venue, prefs, match_state)
-    return recommend_entry(venue, prefs, match_state)
+        return recommend_exit(
+            venue, prefs, match_state, weather=weather, reason_templates=reason_templates
+        )
+    return recommend_entry(
+        venue, prefs, match_state, weather=weather, reason_templates=reason_templates
+    )

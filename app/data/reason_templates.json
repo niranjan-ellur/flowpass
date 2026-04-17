@@ -1,0 +1,39 @@
+{
+  "_generated_at": "2026-04-17T16:59:14.045329+00:00",
+  "_source_prompt_hash": "bd39de2d9acf66be",
+  "_model": "gemini-flash-latest",
+  "templates": {
+    "entry_standard": {
+      "headline": "Take your time reaching {gate_name}",
+      "subtext": "No rush at all. Enjoy the atmosphere and head to {gate_name} whenever you like."
+    },
+    "entry_beat_crush": {
+      "headline": "Head to {gate_name} now to beat the rush",
+      "subtext": "The crowd is building up. It is better to enter through {gate_name} now before it gets too busy."
+    },
+    "entry_step_free": {
+      "headline": "Easy, step-free route to {gate_name}",
+      "subtext": "We have found a comfortable, step-free path to {gate_name} for you. Just follow the signs."
+    },
+    "entry_weather_covered": {
+      "headline": "Use {gate_name} to stay dry",
+      "subtext": "It might rain soon. This route to {gate_name} is mostly covered to keep you dry."
+    },
+    "exit_standard": {
+      "headline": "Time to head towards {gate_name}",
+      "subtext": "The match is finishing. You can start making your way to {gate_name} at your own pace."
+    },
+    "exit_pre_peak": {
+      "headline": "Beat the Metro rush at {gate_name}",
+      "subtext": "The station will get very crowded soon. Leaving through {gate_name} now will save you a lot of time."
+    },
+    "exit_after_ceremony": {
+      "headline": "Head to {gate_name} as the ceremony ends",
+      "subtext": "The presentation is almost over. Better to start moving to {gate_name} now to avoid the exit crowd."
+    },
+    "exit_weather_urgent": {
+      "headline": "Rain is starting, head to {gate_name} now",
+      "subtext": "It is beginning to pour. Please move quickly to {gate_name} to reach covered transport."
+    }
+  }
+}
